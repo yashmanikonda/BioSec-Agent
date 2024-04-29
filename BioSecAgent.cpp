@@ -55,9 +55,8 @@ void LockFolder() {
     LocalFree(pSD);
 }
 
-
 int main() {
-
+    // Define security descriptor
     SECURITY_DESCRIPTOR sd;
     InitializeSecurityDescriptor(&sd, SECURITY_DESCRIPTOR_REVISION);
     SetSecurityDescriptorDacl(&sd, TRUE, NULL, FALSE);
@@ -68,58 +67,66 @@ int main() {
     sa.lpSecurityDescriptor = &sd;
     sa.bInheritHandle = FALSE;
 
-
-    // Create named pipe server
-    HANDLE hPipe = CreateNamedPipe(
-        L"\\\\.\\pipe\\MyNamedPipe",
-        PIPE_ACCESS_DUPLEX,
-        PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-        1,
-        1024,
-        1024,
-        NMPWAIT_USE_DEFAULT_WAIT,
-        &sa);
-
-    if (hPipe == INVALID_HANDLE_VALUE) {
-        std::cerr << "Failed to create named pipe" << std::endl;
-        return 1;
-    }
-
-    std::cout << "Named pipe server created and waiting for connections..." << std::endl;
+    HANDLE hPipe;
 
     while (true) {
+        // Create named pipe server
+        hPipe = CreateNamedPipe(
+            L"\\\\.\\pipe\\MyNamedPipe",
+            PIPE_ACCESS_DUPLEX,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+            1,
+            1024,
+            1024,
+            NMPWAIT_USE_DEFAULT_WAIT,
+            &sa);
+
+        if (hPipe == INVALID_HANDLE_VALUE) {
+            std::cerr << "Failed to create named pipe" << std::endl;
+            continue; // Try again in the next iteration
+        }
+
+        std::cout << "Named pipe server created and waiting for connections..." << std::endl;
+
         // Wait for client connection
         if (ConnectNamedPipe(hPipe, NULL) != FALSE) {
             std::cout << "Client connected" << std::endl;
 
-            // Receive command from client
-            char buffer[1024];
-            DWORD bytesRead;
-            if (ReadFile(hPipe, buffer, sizeof(buffer), &bytesRead, NULL) != FALSE) {
-                // Check if command is "lock" or "unlock"
-                std::string command(buffer, bytesRead);
-                if (command == "lock") {
-                    // Execute lock method logic
-                    std::cout << "call recieved" << std::endl;
-
-                    LockFolder();
-                }
-                else if (command == "unlock") {
-                    // Execute unlock method logic
-                    UnLockFolder();
+            while (true) {
+                // Receive command from client
+                char buffer[1024];
+                DWORD bytesRead;
+                if (ReadFile(hPipe, buffer, sizeof(buffer), &bytesRead, NULL) != FALSE) {
+                    // Check if command is "lock" or "unlock"
+                    std::string command(buffer, bytesRead);
+                    if (command == "p") {
+                        // Execute lock method logic
+                        std::cout << "Lock command received" << std::endl;
+                        LockFolder();
+                    }
+                    else if (command == "b") {
+                        // Execute unlock method logic
+                        std::cout << "BioMetric Functionality not implemented yet" << std::endl;
+                        //UnLockFolder();
+                    }
+                    else {
+                        std::cerr << "Unknown command received: " << command << std::endl;
+                    }
                 }
                 else {
-                    std::cerr << "Unknown command received: " << command << std::endl;
+                    // Log error and attempt to reconnect
+                    std::cerr << "Error reading from pipe" << std::endl;
+                    break;
                 }
             }
-
-            // Disconnect client
-            DisconnectNamedPipe(hPipe);
         }
-    }
+        else {
+            std::cerr << "Error connecting to client" << std::endl;
+        }
 
-    // Close the named pipe (this code will never be reached)
-    CloseHandle(hPipe);
+        // Close the named pipe handle before trying again
+        CloseHandle(hPipe);
+    }
 
     return 0;
 }
