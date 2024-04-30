@@ -2,6 +2,9 @@
 #include <string>
 #include <Windows.h>
 
+HANDLE hPipe; // Declare the named pipe handle globally
+
+
 void SetConsoleSize(int width, int height) {
     HWND console = GetConsoleWindow();
     RECT rect;
@@ -10,9 +13,50 @@ void SetConsoleSize(int width, int height) {
     MoveWindow(console, rect.left, rect.top, width, height, TRUE);
 }
 
+void ConnectToNamedPipe() {
+    // Connect to named pipe server
+    hPipe = CreateFile(
+        L"\\\\.\\pipe\\MyNamedPipe",
+        GENERIC_READ | GENERIC_WRITE,
+        0,
+        NULL,
+        OPEN_EXISTING,
+        0,
+        NULL);
+
+    if (hPipe == INVALID_HANDLE_VALUE) {
+        std::cerr << "Failed to connect to named pipe server" << std::endl;
+        exit(1);
+    }
+}
+
+void HandlePasswordCommand() {
+    std::string password;
+    std::cout << "Enter password: ";
+    std::cin >> password;
+
+    // Send password to server
+    DWORD bytesWritten;
+    WriteFile(hPipe, password.c_str(), password.size(), &bytesWritten, NULL);
+
+    // Response handling (if any)
+}
+
+
+void HandleBiometricCommand() {
+    // Send command to server
+    DWORD bytesWritten;
+    std::string input = "b";
+    WriteFile(hPipe, input.c_str(), input.size(), &bytesWritten, NULL);
+
+    // Response handling (if any)
+}
+
 int main() {
     // Set console size to be square
     SetConsoleSize(600, 600);
+
+    ConnectToNamedPipe(); // Connect to named pipe server
 
     std::string input;
 
@@ -23,29 +67,11 @@ int main() {
         std::cout << "Enter command: ";
         std::cin >> input;
 
-        if (input == "p" || input == "b") {
-            // Connect to named pipe server
-            HANDLE hPipe = CreateFile(
-                L"\\\\.\\pipe\\MyNamedPipe",
-                GENERIC_READ | GENERIC_WRITE,
-                0,
-                NULL,
-                OPEN_EXISTING,
-                0,
-                NULL);
-
-            if (hPipe != INVALID_HANDLE_VALUE) {
-                // Send command to server
-                DWORD bytesWritten;
-                WriteFile(hPipe, input.c_str(), input.size(), &bytesWritten, NULL);
-
-                // Clean up
-                CloseHandle(hPipe);
-            }
-            else {
-                std::cerr << "Failed to connect to named pipe server" << std::endl;
-                return 1;
-            }
+        if (input == "p") {
+            HandlePasswordCommand();
+        }
+        else if (input == "b") {
+            HandleBiometricCommand();
         }
         else if (input == "commands" || input == "command") {
             continue;
@@ -64,5 +90,6 @@ int main() {
         }
     }
 
+    CloseHandle(hPipe); // Close the named pipe handle
     return 0;
 }
