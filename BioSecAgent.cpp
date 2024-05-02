@@ -15,7 +15,37 @@
 #pragma comment(lib, "wininet.lib")
 
 // Global variable for directory path
-LPCWSTR lpDirectoryName = L"C:\\Users\\public\\SecureFolder-BioSec";
+LPCWSTR lpDirectoryName = L"C:\\Users\\yashm\\OneDrive\\Desktop\\SecureFolder-BioSec";
+
+std::string DeleteAPICall() {
+    std::string response;
+
+    HINTERNET hInternet = InternetOpen(L"MyApp", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
+    if (hInternet != NULL) {
+        HINTERNET hConnect = InternetOpenUrl(hInternet, L"https://biosec-backend-imtmoxa2zq-el.a.run.app/delete", NULL, 0, INTERNET_FLAG_RELOAD, 0);
+        if (hConnect != NULL) {
+            // Read the response
+            char buffer[4096];
+            DWORD bytesRead;
+            while (InternetReadFile(hConnect, buffer, sizeof(buffer), &bytesRead) && bytesRead > 0) {
+                // Append the response to the string
+                response.append(buffer, bytesRead);
+            }
+            // Close the connection handle
+            InternetCloseHandle(hConnect);
+        }
+        else {
+            std::cerr << "Failed to open URL" << std::endl;
+        }
+        // Close the Internet handle
+        InternetCloseHandle(hInternet);
+    }
+    else {
+        std::cerr << "Failed to open Internet" << std::endl;
+    }
+
+    return response;
+}
 
 void UnLockFolder() {
     // Specify the security descriptor: D:(A;;GRGW;;;WD)
@@ -36,6 +66,7 @@ void UnLockFolder() {
     }
 
     std::wcout << _T("Security descriptor applied successfully to the directory.") << std::endl;
+    DeleteAPICall();
 
     // Free the memory allocated for the security descriptor
     LocalFree(pSD);
@@ -67,10 +98,10 @@ void LockFolder() {
 
 std::string RequestAPICall() {
     std::string response;
-
+    
     HINTERNET hInternet = InternetOpen(L"MyApp", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (hInternet != NULL) {
-        HINTERNET hConnect = InternetOpenUrl(hInternet, L"https://biosec-api-imtmoxa2zq-el.a.run.app/request", NULL, 0, INTERNET_FLAG_RELOAD, 0);
+        HINTERNET hConnect = InternetOpenUrl(hInternet, L"https://biosec-backend-imtmoxa2zq-el.a.run.app/request", NULL, 0, INTERNET_FLAG_RELOAD, 0);
         if (hConnect != NULL) {
             // Read the response
             char buffer[4096];
@@ -100,7 +131,7 @@ std::string BioResponseCall() {
 
     HINTERNET hInternet = InternetOpen(L"MyApp", INTERNET_OPEN_TYPE_DIRECT, NULL, NULL, 0);
     if (hInternet != NULL) {
-        HINTERNET hConnect = InternetOpenUrl(hInternet, L"https://biosec-api-imtmoxa2zq-el.a.run.app/check2", NULL, 0, INTERNET_FLAG_RELOAD, 0);
+        HINTERNET hConnect = InternetOpenUrl(hInternet, L"https://biosec-backend-imtmoxa2zq-el.a.run.app/check1", NULL, 0, INTERNET_FLAG_RELOAD, 0);
         if (hConnect != NULL) {
             // Read the response
             char buffer[4096];
@@ -125,14 +156,18 @@ std::string BioResponseCall() {
     return response;
 }
 
+
 void BioResponseCallCon() {
     while (true) {
         // Call the biometric API
         std::string apiResponse = BioResponseCall();
 
         // Check the response and execute the appropriate function
-        if (!apiResponse.empty() && apiResponse == "correct") {
+        if (!apiResponse.empty() && apiResponse == "{\"status\":\"correct\"}") {
+
             UnLockFolder();
+            //Sleep(3);
+            //DeleteAPICall();
             //SendStringOverPipe(hPipe, "BioMetric is correct and Folder is Unlocked");
         }
         else if (!apiResponse.empty() && apiResponse == "wrong") {
@@ -245,6 +280,8 @@ bool verifyPassword(const std::string& inputPassword) {
 
 
 int main() {
+    DeleteAPICall();
+
     std::thread bioThread(BioResponseCallCon);
     // Define security descriptor
     SECURITY_DESCRIPTOR sd;
@@ -293,6 +330,12 @@ int main() {
                         std::cout << "Biometric authentication received. Request is sent" << std::endl;
                         std::string apiResponse = RequestAPICall();
                         // Call LockFolder() here for biometric authentication
+                    }
+                    // To lock the folder when lock command is given
+                    else if (bytesRead > 0 && buffer[0] == 'l') {
+                        std::cout << "Folder has been locked" << std::endl;
+                        LockFolder();
+
                     }
                     else {
                         // Extract the received password (excluding the command character)
