@@ -1,6 +1,9 @@
 #include <iostream>
 #include <string>
 #include <Windows.h>
+#include <wininet.h>
+
+#pragma comment(lib, "wininet.lib")
 
 HANDLE hPipe; // Declare the named pipe handle globally
 
@@ -30,6 +33,7 @@ void ConnectToNamedPipe() {
     }
 }
 
+
 void HandlePasswordCommand() {
     std::string password;
     std::cout << "Enter password: ";
@@ -52,6 +56,15 @@ void HandleBiometricCommand() {
     // Response handling (if any)
 }
 
+void HandleLocking() {
+    // Send command to server
+    DWORD bytesWritten;
+    std::string input = "l";
+    WriteFile(hPipe, input.c_str(), input.size(), &bytesWritten, NULL);
+
+    // Response handling (if any)
+}
+
 int main() {
     // Set console size to be square
     SetConsoleSize(600, 600);
@@ -64,6 +77,7 @@ int main() {
         std::cout << "Commands:\n";
         std::cout << "p - for password\n";
         std::cout << "b - for biometric\n";
+        std::cout << "l - to lock the the folder\n";
         std::cout << "Enter command: ";
         std::cin >> input;
 
@@ -72,6 +86,10 @@ int main() {
         }
         else if (input == "b") {
             HandleBiometricCommand();
+        }
+        else if (input == "l" ) {
+            HandleLocking();
+
         }
         else if (input == "commands" || input == "command") {
             continue;
